@@ -16,12 +16,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 取得高雄天氣預報
+ * 取得指定縣市天氣預報
  * CWA 氣象資料開放平臺 API
  * 使用「一般天氣預報-今明 36 小時天氣預報」資料集
  */
-const getKaohsiungWeather = async (req, res) => {
+const getWeatherByCity = async (req, res) => {
   try {
+    const cityName = req.params.city;
+
+    // 支援的縣市列表
+    const supportedCities = ["臺北市", "臺中市", "高雄市"];
+
+    // 驗證縣市名稱
+    if (!supportedCities.includes(cityName)) {
+      return res.status(400).json({
+        error: "不支援的縣市",
+        message: `請選擇以下縣市：${supportedCities.join("、")}`,
+        supportedCities: supportedCities,
+      });
+    }
+
     // 檢查是否有設定 API Key
     if (!CWA_API_KEY) {
       return res.status(500).json({
@@ -37,18 +51,18 @@ const getKaohsiungWeather = async (req, res) => {
       {
         params: {
           Authorization: CWA_API_KEY,
-          locationName: "臺北市",
+          locationName: cityName,
         },
       }
     );
 
-    // 取得高雄市的天氣資料
+    // 取得縣市的天氣資料
     const locationData = response.data.records.location[0];
 
     if (!locationData) {
       return res.status(404).json({
         error: "查無資料",
-        message: "無法取得高雄市天氣資料",
+        message: `無法取得${cityName}天氣資料`,
       });
     }
 
@@ -131,7 +145,12 @@ app.get("/", (req, res) => {
   res.json({
     message: "歡迎使用 CWA 天氣預報 API",
     endpoints: {
-      kaohsiung: "/api/weather/kaohsiung",
+      weather: "/api/weather/:city (臺北市、臺中市、高雄市)",
+      examples: [
+        "/api/weather/臺北市",
+        "/api/weather/臺中市",
+        "/api/weather/高雄市"
+      ],
       health: "/api/health",
     },
   });
@@ -141,8 +160,8 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-// 取得高雄天氣預報
-app.get("/api/weather/kaohsiung", getKaohsiungWeather);
+// 取得指定縣市天氣預報
+app.get("/api/weather/:city", getWeatherByCity);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
